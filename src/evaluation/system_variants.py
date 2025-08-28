@@ -46,18 +46,22 @@ class SystemVariant(ABC):
         result = func()
         end_time = time.time()
         
+        input_tokens, output_tokens, total_tokens = self.llm_service.get_last_token_usage()
+        
         performance = PerformanceMetrics(
             response_time=end_time - start_time,
-            input_tokens=self._estimate_tokens(input_text),
-            output_tokens=self._estimate_tokens(str(result)),
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
             api_calls=1,
             context_size=len(context)
         )
         
         return result, performance
     
-    def _estimate_tokens(self, text: str) -> int:
-        return len(text.split()) * 1.3
+    def _extract_answer_from_result(self, result) -> str:
+        if isinstance(result, dict):
+            return result.get('answer', '')
+        return str(result)
 
 
 class BaselineLLMVariant(SystemVariant):
@@ -157,6 +161,9 @@ class RAGSystemVariant(SystemVariant):
         self.top_k = top_k
         self.pipeline = RAGPipeline(settings)
         
+        # Use the pipeline's LLM service to capture tokens correctly
+        self.llm_service = self.pipeline.llm_service
+        
         if self.pipeline.get_database_stats()["document_count"] == 0:
             self.pipeline.build_index()
     
@@ -172,6 +179,9 @@ class RAGSystemVariant(SystemVariant):
             )
             
             context = self._extract_context_from_result(result)
+            
+            # Update context size with actual context used
+            performance.context_size = len(context)
             
             return AnswerResult(
                 answer=result.get('answer', ''),

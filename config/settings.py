@@ -10,7 +10,7 @@ class Settings:
     LLM_MODEL: str = "gemini-1.5-flash"
     DATABASE_COLLECTION: str = "documents"
     DATABASE_PERSIST_DIR: str = "persistent/"
-    DATA_RAW_DIR: str = "data/raw/"
+    DATA_RAW_DIR: str = "../data/markdown/v2/raw/"
     DATA_PROCESSED_DIR: str = "data/processed/"
     EMBEDDINGS_CACHE_DIR: str = "data/embeddings/"
     API_KEY_FILE: str = ".api_key"

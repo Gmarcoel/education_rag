@@ -5,3 +5,5 @@ legacy/
 data/
 .venv
 .env
+data
+persistent/

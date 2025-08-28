@@ -21,6 +21,9 @@ class GeminiModel(LanguageModel):
         self.api_key = api_key
         self._configure_api()
         self.model = genai.GenerativeModel(model_name)
+        self.last_prompt_tokens = 0
+        self.last_candidates_tokens = 0
+        self.last_total_tokens = 0
     
     def _configure_api(self):
         genai.configure(api_key=self.api_key)
@@ -32,17 +35,34 @@ class GeminiModel(LanguageModel):
         for attempt in range(max_retries):
             try:
                 response = self.model.generate_content(prompt)
+                
+                if hasattr(response, 'usage_metadata'):
+                    usage = response.usage_metadata
+                    self.last_prompt_tokens = usage.prompt_token_count
+                    self.last_candidates_tokens = usage.candidates_token_count
+                    self.last_total_tokens = usage.total_token_count
+                else:
+                    self.last_prompt_tokens = 0
+                    self.last_candidates_tokens = 0
+                    self.last_total_tokens = 0
+                
                 return response.text
             except Exception as e:
                 error_msg = str(e)
                 if "429" in error_msg or "quota" in error_msg.lower():
                     if attempt < max_retries - 1:
-                        # Extract retry delay from error message if available
                         delay = base_delay + random.uniform(5, 15)  # Add jitter
                         print(f"API quota limit hit. Retrying in {delay:.1f} seconds... (attempt {attempt + 1}/{max_retries})")
                         time.sleep(delay)
                         continue
                 raise e
+    
+    def get_last_token_usage(self) -> tuple[int, int, int]:
+        return (
+            self.last_prompt_tokens,
+            self.last_candidates_tokens, 
+            self.last_total_tokens
+        )
 
 
 class LLMService:
@@ -65,3 +85,13 @@ class LLMService:
     
     def generate_response(self, prompt: str) -> str:
         return self.model.generate(prompt)
+    
+    def get_last_token_usage(self) -> tuple[int, int, int]:
+        if hasattr(self.model, 'get_last_token_usage'):
+            return self.model.get_last_token_usage()
+        return (0, 0, 0)
+    
+    def generate_response_with_tokens(self, prompt: str) -> tuple[str, int, int]:
+        response = self.generate_response(prompt)
+        input_tokens, output_tokens, _ = self.get_last_token_usage()
+        return response, input_tokens, output_tokens
